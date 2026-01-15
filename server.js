@@ -57,13 +57,13 @@ app.get('/departments', async (req, res) => {
 });
 
 app.post('/departments', async (req, res) => {
-  await pool.query('SELECT create_department($1)', [req.body.name]);
+  await pool.query('SELECT create_department($1, $2)', [req.body.name, req.body.type_name]);
   res.sendStatus(200);
 });
 
 app.put('/departments', async (req, res) => {
   await pool.query(
-    'SELECT update_department($1,$2)',
+    'SELECT update_department($1,$2, $3)',
     [req.body.old_name, req.body.new_name, req.body.new_type_name]
   );
   res.sendStatus(200);
@@ -184,6 +184,42 @@ app.get('/reports/academic', async (req, res) => {
   const r = await pool.query('SELECT * FROM get_academic_staff()');
   res.json(r.rows);
 });
+
+
+// ---------- DEPARTMENT TYPES ----------
+app.get('/department-types', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT name FROM Department_type ORDER BY name');
+    res.json(r.rows);
+  } catch (error) {
+    console.error('Error fetching department types:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+// ---------- POSITIONS LIST ----------
+app.get('/positions-list', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT name FROM Position ORDER BY name');
+    res.json(r.rows);
+  } catch (error) {
+    console.error('Error fetching positions:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ---------- DEPARTMENTS LIST ----------
+app.get('/departments-list', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT name FROM Department ORDER BY name');
+    res.json(r.rows);
+  } catch (error) {
+    console.error('Error fetching departments:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 
 // ---------- START ----------

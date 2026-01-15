@@ -1,6 +1,10 @@
 let accessLevel = null;
 let currentTable = null;
 let selectedRow = null;
+let selectedRowElement = null;  // Для подсветки выбранной строки
+let departmentTypes = [];       // Кэш типов подразделений из БД
+let positions = [];             // Кэш должностей из БД
+let departments = [];           // Кэш подразделений из БД
 
 const loginDiv = document.getElementById('login');
 const menuDiv = document.getElementById('menu');
@@ -35,6 +39,12 @@ function doLogin() {
     if (accessLevel !== 'admin') {
       adminMenuDiv.style.display = 'none';
     }
+    // Загружаем справочники при успешном входе
+    Promise.all([
+      loadDepartmentTypes(),
+      loadPositionsList(),
+      loadDepartmentsList()
+    ]);
   })
   .catch(() => {
     alert('Неверный логин или пароль');
@@ -45,11 +55,11 @@ function renderTable(data) {
   if (!data || data.length === 0) {
     tableDiv.innerHTML = '<div class="alert alert-secondary">Нет данных</div>';
     selectedRow = null;
+    selectedRowElement = null;
     updateButtons();
     return;
   }
 
-  // Добавляем table-hover для визуального отклика при наведении
   let html = '<table class="table table-bordered table-sm table-hover" style="cursor: pointer;">';
   html += '<thead class="table-dark"><tr>';
 
@@ -60,7 +70,6 @@ function renderTable(data) {
   html += '</tr></thead><tbody>';
 
   data.forEach((row, index) => {
-    // В onclick передаем (index, this)
     html += `<tr onclick="selectRow(${index}, this)" data-row='${JSON.stringify(row).replace(/'/g, "\\'")}'>`;
     Object.values(row).forEach(v => {
       html += `<td>${v ?? ''}</td>`;
@@ -72,28 +81,24 @@ function renderTable(data) {
   tableDiv.innerHTML = html;
 
   selectedRow = null;
+  selectedRowElement = null;
   updateButtons();
 }
 
-let selectedRowElement = null;  // реализация подсветки выбранной строки
 function selectRow(index, element) {
   // Убрать выделение со всех строк
   document.querySelectorAll('#table tr').forEach(tr => {
     tr.classList.remove('selected');
   });
   
-  // реализация подсветки выбранной строки
-  ///////////////////////////////////
   // 1. Снимаем класс выделения с предыдущей строки, если она была
   if (selectedRowElement) {
     selectedRowElement.classList.remove('table-primary');
   }
   // 2. Добавляем класс primary текущей строке
   element.classList.add('table-primary');
-   // 3. Обновляем ссылку на текущую строку
-  selectedRowElement = element
-  ///////////////////////////////////
-
+  // 3. Обновляем ссылку на текущую строку
+  selectedRowElement = element;
 
   // Выделить выбранную строку
   element.classList.add('selected');
@@ -136,6 +141,27 @@ function showAddForm() {
   // Генерируем поля в зависимости от таблицы
   const fields = getFormFields();
   
+  // Для сотрудников предварительно загружаем справочники если еще не загружены
+  if (currentTable === 'employees' && (positions.length === 0 || departments.length === 0)) {
+    Promise.all([
+      positions.length === 0 ? loadPositionsList() : Promise.resolve(),
+      departments.length === 0 ? loadDepartmentsList() : Promise.resolve()
+    ]).then(() => {
+      createFormFields(fields);
+    });
+  } else if (currentTable === 'departments' && departmentTypes.length === 0) {
+    loadDepartmentTypes().then(() => {
+      createFormFields(fields);
+    });
+  } else {
+    createFormFields(fields);
+  }
+  
+  // Устанавливаем обработчик для сохранения
+  formSubmit.onclick = saveData;
+}
+
+function createFormFields(fields) {
   fields.forEach(field => {
     const div = document.createElement('div');
     div.className = 'mb-3';
@@ -152,12 +178,42 @@ function showAddForm() {
       input.id = field.name;
       input.name = field.name;
       
-      // Здесь можно добавить опции для select
+      // Добавляем пустую опцию для выпадающего списка
+      const emptyOption = document.createElement('option');
+      emptyOption.value = '';
+      emptyOption.textContent = '-- Выберите --';
+      input.appendChild(emptyOption);
+      
+      // Заполняем опции в зависимости от поля
       if (field.name === 'qualification') {
         ['Бакалавр', 'Магистр', 'Специалист'].forEach(opt => {
           const option = document.createElement('option');
           option.value = opt;
           option.textContent = opt;
+          input.appendChild(option);
+        });
+      } else if (field.name === 'type_name' && currentTable === 'departments') {
+        // Для типа подразделения используем данные из БД
+        departmentTypes.forEach(type => {
+          const option = document.createElement('option');
+          option.value = type;
+          option.textContent = type;
+          input.appendChild(option);
+        });
+      } else if (field.name === 'position_name' && currentTable === 'employees') {
+        // Для должности используем данные из БД
+        positions.forEach(position => {
+          const option = document.createElement('option');
+          option.value = position;
+          option.textContent = position;
+          input.appendChild(option);
+        });
+      } else if (field.name === 'department_name' && currentTable === 'employees') {
+        // Для подразделения используем данные из БД
+        departments.forEach(department => {
+          const option = document.createElement('option');
+          option.value = department;
+          option.textContent = department;
           input.appendChild(option);
         });
       }
@@ -186,9 +242,6 @@ function showAddForm() {
     div.appendChild(input);
     dataForm.appendChild(div);
   });
-  
-  // Устанавливаем обработчик для сохранения
-  formSubmit.onclick = saveData;
 }
 
 function showEditForm() {
@@ -197,26 +250,78 @@ function showEditForm() {
   showAddForm();
   formTitle.textContent = `Редактировать ${getTableTitle()}`;
   
-  // Заполняем поля данными из выбранной строки
-  const fields = getFormFields();
-  fields.forEach(field => {
-    const input = document.getElementById(field.name);
-    if (input && selectedRow[field.name] !== undefined) {
-      input.value = selectedRow[field.name];
-    }
-  });
+  // Ждем пока форма создастся (особенно важно для select)
+  setTimeout(() => {
+    const fields = getFormFields();
+    fields.forEach(field => {
+      const input = document.getElementById(field.name);
+      if (input && selectedRow[field.name] !== undefined) {
+        if (field.type === 'select') {
+          // Для select устанавливаем значение
+          input.value = selectedRow[field.name];
+        } else {
+          input.value = selectedRow[field.name];
+        }
+      }
+    });
+  }, 100);
 }
 
 function hideForm() {
   formContainer.style.display = 'none';
   dataForm.innerHTML = '';
   selectedRow = null;
-  updateButtons();
   
   // Снять выделение со строк
   document.querySelectorAll('#table tr').forEach(tr => {
     tr.classList.remove('selected');
+    tr.classList.remove('table-primary');
   });
+  
+  selectedRowElement = null;
+  updateButtons();
+}
+
+async function loadDepartmentTypes() {
+  try {
+    const response = await fetch('/department-types');
+    if (response.ok) {
+      const data = await response.json();
+      departmentTypes = data.map(item => item.name);
+      return departmentTypes;
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки типов подразделений:', error);
+  }
+  return [];
+}
+
+async function loadPositionsList() {
+  try {
+    const response = await fetch('/positions-list');
+    if (response.ok) {
+      const data = await response.json();
+      positions = data.map(item => item.name);
+      return positions;
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки должностей:', error);
+  }
+  return [];
+}
+
+async function loadDepartmentsList() {
+  try {
+    const response = await fetch('/departments-list');
+    if (response.ok) {
+      const data = await response.json();
+      departments = data.map(item => item.name);
+      return departments;
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки подразделений:', error);
+  }
+  return [];
 }
 
 function saveData() {
@@ -319,8 +424,8 @@ function getFormFields() {
     case 'employees':
       return [
         { name: 'fio', label: 'ФИО', type: 'text', required: true },
-        { name: 'department_name', label: 'Подразделение', type: 'text', required: true },
-        { name: 'position_name', label: 'Должность', type: 'text', required: true },
+        { name: 'department_name', label: 'Подразделение', type: 'select', required: true },
+        { name: 'position_name', label: 'Должность', type: 'select', required: true },
         { name: 'birth_year', label: 'Год рождения', type: 'number', required: true, min: 1900, max: new Date().getFullYear() },
         { name: 'specialty', label: 'Специальность', type: 'text', required: true },
         { name: 'qualification', label: 'Квалификация', type: 'select', required: true },
@@ -335,7 +440,7 @@ function getFormFields() {
     case 'departments':
       return [
         { name: 'name', label: 'Название подразделения', type: 'text', required: true },
-        { name: 'type_name', label: 'Тип подразделения', type: 'text', required: true }
+        { name: 'type_name', label: 'Тип подразделения', type: 'select', required: true }
       ];
     default:
       return [];
