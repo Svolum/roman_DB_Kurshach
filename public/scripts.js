@@ -203,7 +203,7 @@ function showAddPhoneForm() {
   dataForm.innerHTML = '';
   
   // Создаем поля для телефона
-  createPhoneFormFields();
+  createPhoneFormFields(null);
   
   // Устанавливаем обработчик для сохранения телефона
   formSubmit.onclick = savePhoneData;
@@ -211,26 +211,31 @@ function showAddPhoneForm() {
 
 function showEditPhoneForm() {
   if (!selectedRow || !selectedEmployeeId) return;
-  
-  showAddPhoneForm();
+
+  formContainer.style.display = 'block';
   formTitle.textContent = 'Изменить телефон';
   
-  // Заполняем поля данными из выбранного телефона
-  setTimeout(() => {
-    document.getElementById('phone_type_name').value = selectedRow.phone_type_name;
-    document.getElementById('phone_number').value = selectedRow.phone_number;
-  }, 100);
+  // Очищаем форму
+  dataForm.innerHTML = '';
+  
+  // Создаем поля для телефона с текущими данными
+  createPhoneFormFields(selectedRow);
+  
+  // Устанавливаем обработчик для сохранения телефона
+  formSubmit.onclick = savePhoneData;
 }
 
-function createPhoneFormFields() {
-  // Поле для типа телефона (выпадающий список)
+function createPhoneFormFields(phoneData) {
+  // Определяем ключи, чтобы не дублировать код
+  const keyType = 'Тип телефона';
+  const keyNumber = 'Номер телефона';
+
   const typeDiv = document.createElement('div');
   typeDiv.className = 'mb-3';
   
   const typeLabel = document.createElement('label');
   typeLabel.className = 'form-label';
   typeLabel.textContent = 'Тип телефона';
-  typeLabel.htmlFor = 'phone_type_name';
   
   const typeSelect = document.createElement('select');
   typeSelect.className = 'form-select';
@@ -238,68 +243,119 @@ function createPhoneFormFields() {
   typeSelect.name = 'phone_type_name';
   typeSelect.required = true;
   
-  // Добавляем пустую опцию
   const emptyOption = document.createElement('option');
   emptyOption.value = '';
   emptyOption.textContent = '-- Выберите тип --';
+  emptyOption.disabled = true;
+  // Если данных нет ИЛИ в данных нет нужного ключа
+  emptyOption.selected = !phoneData || !phoneData[keyType]; 
   typeSelect.appendChild(emptyOption);
   
-  // Заполняем опции из кэша типов телефонов
-  phoneTypes.forEach(type => {
-    const option = document.createElement('option');
-    option.value = type;
-    option.textContent = type;
-    typeSelect.appendChild(option);
-  });
+  if (typeof phoneTypes !== 'undefined') {
+    phoneTypes.forEach(type => {
+      const option = document.createElement('option');
+      option.value = type;
+      option.textContent = type;
+      // Сравниваем с русским ключом
+      if (phoneData && phoneData[keyType] === type) {
+        option.selected = true;
+      }
+      typeSelect.appendChild(option);
+    });
+  }
   
   typeDiv.appendChild(typeLabel);
   typeDiv.appendChild(typeSelect);
   dataForm.appendChild(typeDiv);
   
-  // Поле для номера телефона
   const numberDiv = document.createElement('div');
   numberDiv.className = 'mb-3';
   
   const numberLabel = document.createElement('label');
   numberLabel.className = 'form-label';
   numberLabel.textContent = 'Номер телефона';
-  numberLabel.htmlFor = 'phone_number';
   
   const numberInput = document.createElement('input');
-  numberInput.type = 'text';
+  numberInput.type = 'tel';
+  numberInput.inputMode = 'tel';
   numberInput.className = 'form-control';
   numberInput.id = 'phone_number';
   numberInput.name = 'phone_number';
   numberInput.required = true;
-  numberInput.placeholder = 'Введите номер телефона';
+  numberInput.placeholder = '+7 (___) ___-__-__';
+  numberInput.pattern = '\\+7\\s?\\(\\d{3}\\)\\s?\\d{3}-\\d{2}-\\d{2}';
+  
+  // Используем русский ключ для извлечения номера
+  if (phoneData && phoneData[keyNumber]) {
+    numberInput.value = phoneData[keyNumber];
+  }
+  
+  // Логика маски (оставляем без изменений, она корректна)
+  numberInput.addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.startsWith('8') || value.startsWith('7')) value = value.substring(1);
+    value = value.substring(0, 10);
+    
+    let formattedValue = '';
+    if (value.length > 0) {
+      formattedValue = '+7 (' + value.substring(0, 3);
+      if (value.length >= 3) formattedValue += ') ' + value.substring(3, 6);
+      if (value.length >= 6) formattedValue += '-' + value.substring(6, 8);
+      if (value.length >= 8) formattedValue += '-' + value.substring(8, 10);
+    }
+    e.target.value = formattedValue;
+  });
   
   numberDiv.appendChild(numberLabel);
   numberDiv.appendChild(numberInput);
   dataForm.appendChild(numberDiv);
+  
+  // Скрытое поле для старого номера (используем русский ключ)
+  if (phoneData && phoneData[keyNumber]) {
+    const oldNumberInput = document.createElement('input');
+    oldNumberInput.type = 'hidden';
+    oldNumberInput.id = 'old_phone_number';
+    oldNumberInput.value = phoneData[keyNumber];
+    dataForm.appendChild(oldNumberInput);
+  }
 }
+
+
 
 function savePhoneData() {
   const phoneType = document.getElementById('phone_type_name').value;
   const phoneNumber = document.getElementById('phone_number').value;
+  // Используем опциональную цепочку и value или null
+  const oldPhoneNumber = document.getElementById('old_phone_number') ? document.getElementById('old_phone_number').value : null;
   
   if (!phoneType || !phoneNumber) {
     alert('Заполните все поля');
     return;
   }
   
-  const method = formTitle.textContent.startsWith('Добавить') ? 'POST' : 'PUT';
-  let url = '/phones';
+  // ИСПРАВЛЕННЫЙ REGEX (добавлены \s? для опциональных пробелов)
+  // Соответствует формату +7 (999) 999-99-99 или +7(999)999-99-99
+  const phoneRegex = /^\+7\s?\(\d{3}\)\s?\d{3}-\d{2}-\d{2}$/;
+  
+  if (!phoneRegex.test(phoneNumber)) {
+    alert('Номер телефона должен быть в формате: +7 (XXX) XXX-XX-XX');
+    return;
+  }
+  
+  const method = oldPhoneNumber ? 'PUT' : 'POST';
+  
+  // Если ваш API требует старый номер в URL при PUT:
+  // let url = method === 'PUT' ? `/phones/${encodeURIComponent(oldPhoneNumber)}` : '/phones';
+  let url = '/phones'; 
+
   let body = {
-    employee_id: selectedEmployeeId,
+    employee_id: selectedEmployeeId, // Убедитесь, что эта переменная доступна в области видимости
     phone_type_name: phoneType,
     phone_number: phoneNumber
   };
   
-  // Для изменения нужно передать старый номер телефона
   if (method === 'PUT') {
-    body.old_phone_number = selectedRow.phone_number;
-    body.new_phone_number = phoneNumber;
-    body.new_phone_type_name = phoneType;
+    body.old_phone_number = oldPhoneNumber;
   }
   
   fetch(url, {
@@ -307,19 +363,25 @@ function savePhoneData() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   })
-  .then(r => {
+  .then(async r => {
     if (r.ok) {
       hideForm();
-      loadPhonesForEmployee(selectedEmployeeId);
+      // Убедитесь, что функция loadPhonesForEmployee существует
+      if (typeof loadPhonesForEmployee === 'function') {
+          loadPhonesForEmployee(selectedEmployeeId);
+      }
     } else {
-      alert('Ошибка при сохранении телефона');
+      // Пытаемся получить текст ошибки от сервера
+      const errData = await r.json().catch(() => ({}));
+      alert('Ошибка при сохранении: ' + (errData.message || r.statusText));
     }
   })
   .catch(error => {
     console.error('Error:', error);
-    alert('Ошибка при сохранении телефона');
+    alert('Сетевая ошибка при сохранении телефона');
   });
 }
+
 
 function deleteSelectedPhone() {
   if (!selectedRow || !selectedEmployeeId || !confirm('Вы уверены, что хотите удалить телефон?')) {
@@ -331,7 +393,7 @@ function deleteSelectedPhone() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       employee_id: selectedEmployeeId,
-      phone_number: selectedRow.phone_number
+      phone_number: selectedRow['Номер телефона'] // Используем правильное имя поля
     })
   })
   .then(r => {
@@ -523,7 +585,7 @@ async function loadEmployeesList() {
       employees.forEach(employee => {
         const option = document.createElement('option');
         option.value = employee.id;
-        option.textContent = employee.fio + " | " + employee.department_name + " | " + employee.position_name + " | " + employee.birth_year;
+        option.textContent = employee.fio;
         employeeSelect.appendChild(option);
       });
       
@@ -568,7 +630,7 @@ function loadPhonesForEmployee(employeeId) {
       if (data.length === 0) {
         tableDiv.innerHTML = '<div class="alert alert-info">У сотрудника нет телефонов</div>';
       } else {
-        // Преобразуем данные для отображения
+        // Преобразуем данные для отображения - используем правильные имена полей
         const formattedData = data.map(phone => ({
           'Тип телефона': phone.phone_type_name,
           'Номер телефона': phone.phone_number
@@ -596,11 +658,20 @@ function saveData() {
   let url = '';
   
   if (currentTable === 'employees') {
+    
+    if (/\d/.test(selectedRow.fio)) {
+      alert('ФИО не должно содержать цифры');
+      return;
+    }
     if (method === 'PUT') {
       data.id = selectedRow.id;
     }
     url = '/employees';
   } else if (currentTable === 'positions') {
+    if (selectedRow && /\d/.test(selectedRow.name)) {
+      alert('Название должности не должно содержать цифры');
+      return;
+    }
     if (method === 'PUT') {
       data.old_name = selectedRow.name;
       data.new_name = data.name;
@@ -684,7 +755,7 @@ function getFormFields() {
   switch(currentTable) {
     case 'employees':
       return [
-        { name: 'fio', label: 'ФИО', type: 'text', required: true },
+        { name: 'fio', label: 'ФИО', type: 'text', required: true, pattern: '^[A-Za-zА-Яа-яЁё\\s\\-]+$' },
         { name: 'department_name', label: 'Подразделение', type: 'select', required: true },
         { name: 'position_name', label: 'Должность', type: 'select', required: true },
         { name: 'birth_year', label: 'Год рождения', type: 'number', required: true, min: 1900, max: new Date().getFullYear() },
@@ -747,13 +818,19 @@ function loadPhones() {
   hideForm();
   
   // Если список сотрудников еще не загружен, загружаем его
+  if (employees.length === 0) {
     loadEmployeesList().then(() => {
       tableDiv.innerHTML = '<div class="alert alert-info">Выберите сотрудника для работы с телефонами</div>';
       selectedRow = null;
       selectedRowElement = null;
       updateButtons();
     });
-  
+  } else {
+    tableDiv.innerHTML = '<div class="alert alert-info">Выберите сотрудника для работы с телефонами</div>';
+    selectedRow = null;
+    selectedRowElement = null;
+    updateButtons();
+  }
 }
 
 function loadPhoneReport() {

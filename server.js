@@ -134,35 +134,53 @@ app.get('/phones/:employeeId', async (req, res) => {
   res.json(r.rows);
 });
 
+
 app.post('/phones', async (req, res) => {
   const p = req.body;
-  await pool.query(
-    'SELECT create_phone($1,$2,$3)',
-    [p.employee_id, p.phone_number, p.phone_type_name]
-  );
-  res.sendStatus(200);
+  try {
+    await pool.query(
+      'SELECT create_phone($1,$2,$3)',
+      [p.employee_id, p.phone_number, p.phone_type_name]
+    );
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Error creating phone:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
+
 
 app.put('/phones', async (req, res) => {
   const p = req.body;
-  await pool.query(
-    'SELECT update_phone($1,$2,$3,$4)',
-    [
-      p.employee_id,
-      p.old_phone_number,
-      p.new_phone_number,
-      p.new_phone_type_name
-    ]
-  );
-  res.sendStatus(200);
+  try {
+    await pool.query(
+      'SELECT update_phone($1,$2,$3,$4)',
+      [
+        p.employee_id,
+        p.old_phone_number,
+        p.phone_number, // Используем phone_number вместо new_phone_number
+        p.phone_type_name // Используем phone_type_name вместо new_phone_type_name
+      ]
+    );
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Error updating phone:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
+
 app.delete('/phones', async (req, res) => {
-  await pool.query(
-    'SELECT delete_phone($1,$2)',
-    [req.body.employee_id, req.body.phone_number]
-  );
-  res.sendStatus(200);
+  try {
+    await pool.query(
+      'SELECT delete_phone($1,$2)',
+      [req.body.employee_id, req.body.phone_number]
+    );
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Error deleting phone:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 
