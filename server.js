@@ -2,6 +2,10 @@ const express = require('express');
 const path = require('path');
 const pool = require('./db');
 
+const PDFDocument = require('pdfkit');
+const ExcelJS = require('exceljs');
+
+
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
@@ -258,6 +262,111 @@ app.get('/phone-types', async (req, res) => {
     console.error('Error fetching phone types:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+
+// EXPORT ---------------
+app.get('/export/pdf/:report', async (req, res) => {
+  let title = '';
+  let rows = [];
+
+  switch (req.params.report) {
+    case 'phone-directory':
+      title = 'Телефонный справочник';
+      rows = (await pool.query('SELECT * FROM get_phone_directory()')).rows;
+      break;
+
+    case 'experience':
+      title = 'Стаж работы ≤ 15 лет';
+      rows = (await pool.query('SELECT * FROM get_employees_by_experience(15)')).rows;
+      break;
+
+    case 'academic':
+      title = 'Сведения об учёных степенях';
+      rows = (await pool.query('SELECT * FROM get_academic_staff()')).rows;
+      break;
+
+    default:
+      return res.sendStatus(404);
+  }
+
+  const doc = new PDFDocument({ margin: 40 });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${req.params.report}.pdf"`);
+
+  doc.pipe(res);
+
+  // Заголовок
+  doc.fontSize(16).text(title, { align: 'center' });
+  doc.moveDown();
+
+  // Таблица
+  doc.fontSize(10);
+  rows.forEach(row => {
+    Object.values(row).forEach(v => {
+      doc.text(String(v));
+    });
+    doc.moveDown(0.5);
+  });
+
+  // Дата
+  doc.moveDown();
+  doc.fontSize(9).text(
+    `Отчёт сформирован: ${new Date().toLocaleString()}`,
+    { align: 'right' }
+  );
+
+  doc.end();
+});
+
+app.get('/export/excel/:report', async (req, res) => {
+  let title = '';
+  let rows = [];
+
+  switch (req.params.report) {
+    case 'phone-directory':
+      title = 'Телефонный справочник';
+      rows = (await pool.query('SELECT * FROM get_phone_directory()')).rows;
+      break;
+
+    case 'experience':
+      title = 'Стаж работы ≤ 15 лет';
+      rows = (await pool.query('SELECT * FROM get_employees_by_experience(15)')).rows;
+      break;
+
+    case 'academic':
+      title = 'Сведения об учёных степенях';
+      rows = (await pool.query('SELECT * FROM get_academic_staff()')).rows;
+      break;
+
+    default:
+      return res.sendStatus(404);
+  }
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Отчёт');
+
+  ws.addRow([title]);
+  ws.mergeCells(1, 1, 1, Object.keys(rows[0]).length);
+  ws.getRow(1).font = { bold: true };
+
+  ws.addRow(Object.keys(rows[0]));
+  rows.forEach(r => ws.addRow(Object.values(r)));
+
+  ws.addRow([]);
+  ws.addRow([`Отчёт сформирован: ${new Date().toLocaleString()}`]);
+
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${req.params.report}.xlsx"`
+  );
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+
+  await wb.xlsx.write(res);
+  res.end();
 });
 
 

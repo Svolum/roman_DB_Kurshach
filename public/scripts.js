@@ -9,6 +9,9 @@ let employees = [];             // Кэш сотрудников для выпа
 let phoneTypes = [];            // Кэш типов телефонов из БД
 let selectedEmployeeId = null;  // ID выбранного сотрудника для работы с телефонами
 
+
+const exportDiv = document.getElementById('export-buttons');
+
 const loginDiv = document.getElementById('login');
 const menuDiv = document.getElementById('menu');
 const adminMenuDiv = document.getElementById('adminMenu');
@@ -123,6 +126,9 @@ function selectRow(index, element) {
 }
 
 function updateButtons() {
+  const isReport = ['phone-directory', 'experience', 'academic'].includes(currentTable);
+  exportDiv.style.display = isReport ? 'block' : 'none';
+
   // Показываем/скрываем панель управления в зависимости от текущей таблицы
   const isCRUDTable = ['employees', 'positions', 'departments'].includes(currentTable);
   const isPhonesTable = currentTable === 'phones';
@@ -733,12 +739,12 @@ function deleteSelected() {
       hideForm();
       loadTableData();
     } else {
-      alert('Ошибка при удалении');
+      alert('Ошибка при удалении 1');
     }
   })
   .catch(error => {
     console.error('Error:', error);
-    alert('Ошибка при удалении');
+    alert('Ошибка при удалении 2');
   });
 }
 
@@ -862,3 +868,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Форма изначально скрыта
   hideForm();
 });
+
+function exportExcel() {
+  window.open(`/export/excel/${currentTable}`, '_blank');
+}
