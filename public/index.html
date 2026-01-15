@@ -23,6 +23,9 @@
       background-color: rgba(13, 110, 253, 0.1);
       cursor: pointer;
     }
+    #phone-controls {
+      display: none;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -52,6 +55,7 @@
           <button class="btn btn-outline-primary me-2" onclick="loadEmployees()">Сотрудники</button>
           <button class="btn btn-outline-primary me-2" onclick="loadPositions()">Должности</button>
           <button class="btn btn-outline-primary me-2" onclick="loadDepartments()">Подразделения</button>
+          <button class="btn btn-outline-primary me-2" onclick="loadPhones()">Телефоны сотрудников</button>
         </div>
         <div class="mb-3">
           <button class="btn btn-outline-success me-2" onclick="loadPhoneReport()">Телефонный справочник</button>
@@ -64,12 +68,28 @@
     <!-- Таблица -->
     <div class="card mt-4">
       <div class="card-body">
+        <!-- Для телефонов: выбор сотрудника -->
+        <div id="phone-selector" style="display: none;" class="mb-3">
+          <label class="form-label">Выберите сотрудника:</label>
+          <select id="employee-select" class="form-select" onchange="onEmployeeSelected()">
+            <option value="">-- Выберите сотрудника --</option>
+          </select>
+        </div>
+
         <!-- Кнопки управления (изначально скрыты) -->
         <div id="controls" class="mb-3">
           <button id="add-btn" class="btn btn-success" onclick="showAddForm()">Добавить</button>
           <button id="edit-btn" class="btn btn-warning" onclick="showEditForm()" disabled>Изменить</button>
           <button id="delete-btn" class="btn btn-danger" onclick="deleteSelected()" disabled>Удалить</button>
         </div>
+
+        <!-- Кнопки управления для телефонов (изначально скрыты) -->
+        <div id="phone-controls" class="mb-3">
+          <button id="add-phone-btn" class="btn btn-success" onclick="showAddPhoneForm()">Добавить телефон</button>
+          <button id="edit-phone-btn" class="btn btn-warning" onclick="showEditPhoneForm()" disabled>Изменить</button>
+          <button id="delete-phone-btn" class="btn btn-danger" onclick="deleteSelectedPhone()" disabled>Удалить</button>
+        </div>
+        
         <div id="table"></div>
       </div>
     </div>
@@ -80,9 +100,6 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 id="form-title" class="card-title mb-0">Добавить запись</h5>
           <button type="button" class="btn-close" aria-label="Закрыть" onclick="hideForm()"></button>
-        </div>
-        <div class="alert alert-info" style="display: none;" id="form-info">
-          Загружаем справочники...
         </div>
         <form id="data-form">
           <!-- Поля будут генерироваться динамически -->

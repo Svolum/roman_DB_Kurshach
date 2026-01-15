@@ -220,6 +220,28 @@ app.get('/departments-list', async (req, res) => {
   }
 });
 
+// ---------- EMPLOYEES LIST (для выпадающего списка) ----------
+app.get('/employees-list', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT id, fio, department_name, position_name, birth_year FROM Employee ORDER BY fio');
+    res.json(r.rows);
+  } catch (error) {
+    console.error('Error fetching employees list:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ---------- PHONE TYPES ----------
+app.get('/phone-types', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT name FROM Phone_type ORDER BY name');
+    res.json(r.rows);
+  } catch (error) {
+    console.error('Error fetching phone types:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 
 // ---------- START ----------
