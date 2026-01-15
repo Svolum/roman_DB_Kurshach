@@ -664,8 +664,18 @@ function saveData() {
   let url = '';
   
   if (currentTable === 'employees') {
-    
-    if (/\d/.test(selectedRow.fio)) {
+    console.log('data:', data);
+    if (
+        data.fio.trim().length === 0 || 
+        data.department_name.trim().length === 0 || 
+        data.position_name.trim().length === 0 ||
+        data.birth_year.trim().length === 0 ||
+        data.specialty.trim().length === 0
+      ) {
+      alert('поля не должны быть пустыми');
+      return;
+    }
+    if (/\d/.test(data.fio)) {
       alert('ФИО не должно содержать цифры');
       return;
     }
@@ -678,12 +688,20 @@ function saveData() {
       alert('Название должности не должно содержать цифры');
       return;
     }
+    if (data.name.trim().length === 0) {
+      alert('Название должности не должно быть пустым');
+      return;
+    }
     if (method === 'PUT') {
       data.old_name = selectedRow.name;
       data.new_name = data.name;
     }
     url = '/positions';
   } else if (currentTable === 'departments') {
+    if (data.name.trim().length === 0 || data.type_name.trim().length === 0) {
+      alert('Название подразделения и тип подразделения не должны быть пустыми');
+      return;
+    }
     if (method === 'PUT') {
       data.old_name = selectedRow.name;
       data.new_name = data.name;
@@ -744,7 +762,8 @@ function deleteSelected() {
   })
   .catch(error => {
     console.error('Error:', error);
-    alert('Ошибка при удалении 2');
+    // надо наверное нормально ошибку ловить и ещё в бд её создавать
+    alert('запись учавствует в других таблицах, удаление невозможно');
   });
 }
 
