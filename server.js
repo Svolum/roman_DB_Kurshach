@@ -74,7 +74,6 @@ app.delete('/departments', async (req, res) => {
   res.sendStatus(200);
 });
 
-
 // ---------- EMPLOYEES ----------
 app.get('/employees', async (req, res) => {
   const r = await pool.query('SELECT * FROM get_employees()');
