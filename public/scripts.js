@@ -67,6 +67,7 @@ function doLogin() {
 }
 
 function renderTable(data) {
+  document.getElementById('reportSummary').innerHTML = '';
   if (!data || data.length === 0) {
     tableDiv.innerHTML = '<div class="alert alert-secondary">Нет данных</div>';
     selectedRow = null;
@@ -886,10 +887,12 @@ function loadExperienceReport() {
 
 function loadAcademicReport() {
   currentTable = 'academic';
-  hideForm();
   fetch('/reports/academic')
     .then(r => r.json())
-    .then(renderTable);
+    .then(data => {
+      renderTable(data.rows);
+      renderAcademicSummary(data.summary);
+    });
 }
 
 // Инициализация при загрузке
@@ -904,4 +907,28 @@ function exportExcel() {
   } else {
     window.open(`/export/excel/${currentTable}`, '_blank');
   }
+}
+
+function renderAcademicSummary(summary) {
+  const div = document.getElementById('reportSummary');
+
+  div.innerHTML = `
+    <p><strong>Всего:</strong></p>
+    <p>
+      общая численность преподавателей, привлекаемых к реализации
+      соответствующих циклов дисциплин: ${summary.totalCount} чел.
+    </p>
+    <p>
+      Лиц с учёными степенями и учёными званиями: ${summary.degreeCount} чел.
+    </p>
+
+    <p>
+      Наличие документов об участии в учебном процессе в вузе всех лиц,
+      поименованных в списке, имеется.
+    </p>
+    <p>
+      Поименованные лица не имеют запрета на педагогическую деятельность
+      приговором суда или по медицинским показаниям.
+    </p>
+  `;
 }

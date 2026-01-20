@@ -203,9 +203,38 @@ app.get('/reports/experience/:max', async (req, res) => {
 });
 
 app.get('/reports/academic', async (req, res) => {
-  const r = await pool.query('SELECT * FROM get_academic_staff()');
-  res.json(r.rows);
+
+  const rows = (await pool.query(`
+    SELECT
+      fio AS "ФИО",
+      specialty AS "Специальность",
+      academic_degree AS "Учёная степень",
+      academic_title AS "Учёное звание",
+      scientific_pedagogical_experience AS "Стаж педагога",
+      department_name AS "Подразделение",
+      position_name AS "Должность"
+    FROM get_academic_staff()
+  `)).rows;
+
+  const totalCount = rows.length;
+
+  const r2 = await pool.query(`
+    SELECT COUNT(*) FROM Employee
+    WHERE academic_degree IS NOT NULL
+      AND academic_title IS NOT NULL
+  `);
+
+  const degreeCount = Number(r2.rows[0].count);
+
+  res.json({
+    rows,
+    summary: {
+      totalCount,
+      degreeCount
+    }
+  });
 });
+
 
 
 // ---------- DEPARTMENT TYPES ----------
@@ -373,6 +402,8 @@ app.get('/export/excel/:report', async (req, res) => {
     // По умолчанию Postgres называет колонку "count"
     const count = Number(res.rows[0].count); // Теперь это число (number)
     ws.addRow([`Лиц с учёными степенями и учёными званиями: ${count}`]);
+    ws.addRow(['Наличие документов об участии в учебном процессе в вузе всех лиц, поименованных в списке, имеется.']);
+    ws.addRow(['Поименованные лица не имеют запрета на педагогическую деятельность приговором суда или по медицинским показаниям.']);
   }
 
   ws.addRow([]);
