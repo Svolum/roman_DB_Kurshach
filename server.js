@@ -326,7 +326,7 @@ app.get('/export/excel/:report', async (req, res) => {
   switch (req.params.report) {
     case 'phone-directory':
       title = 'Телефонный справочник';
-      rows = (await pool.query('SELECT * FROM get_phone_directory()')).rows;
+      rows = (await pool.query('SELECT department_name AS Подразделение, fio AS ФИО, phone_number AS Номер_телефона, phone_type AS Тип_телефона FROM get_phone_directory()')).rows;
       break;
 
     case 'experience':
@@ -336,7 +336,17 @@ app.get('/export/excel/:report', async (req, res) => {
 
     case 'academic':
       title = 'Сведения об учёных степенях';
-      rows = (await pool.query('SELECT * FROM get_academic_staff()')).rows;
+      rows = (await pool.query(`
+          SELECT
+            FIO AS ФИО, 
+            specialty AS Специальность,
+            academic_degree AS Учёная_степень,
+            academic_title AS Учёное_звание,
+            scientific_pedagogical_experience AS Стаж_педагога,
+            department_name AS Подразделение,
+            position_name AS Должность
+          FROM get_academic_staff()
+        `)).rows;
       break;
 
     default:
@@ -353,12 +363,56 @@ app.get('/export/excel/:report', async (req, res) => {
   ws.addRow(Object.keys(rows[0]));
   rows.forEach(r => ws.addRow(Object.values(r)));
 
+  if (req.params.report === 'academic') {
+    ws.addRow([]);
+    ws.addRow([`Общая численность преподавателей, привлекаемых к реализации соответсвующих циклов дисциплин: ${rows.length}`]);
+    const res = await pool.query(`
+      SELECT COUNT(*) FROM Employee 
+      WHERE academic_degree IS NOT NULL AND academic_title IS NOT NULL
+    `);
+    // По умолчанию Postgres называет колонку "count"
+    const count = Number(res.rows[0].count); // Теперь это число (number)
+    ws.addRow([`Лиц с учёными степенями и учёными званиями: ${count}`]);
+  }
+
   ws.addRow([]);
   ws.addRow([`Отчёт сформирован: ${new Date().toLocaleString()}`]);
 
   res.setHeader(
     'Content-Disposition',
     `attachment; filename="${req.params.report}.xlsx"`
+  );
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+
+  await wb.xlsx.write(res);
+  res.end();
+});
+
+app.get('/export/experience_exel/:stageval', async (req, res) => {
+  let title = '';
+  let rows = [];
+  title = `Стаж работы ≤ ${req.params.stageval} лет`;
+  rows = (await pool.query(`SELECT department_name AS Подразделение, fio AS ФИО, work_experience AS Стаж, position_name AS Должность FROM get_employees_by_experience(${req.params.stageval})`)).rows;
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Отчёт');
+
+  ws.addRow([title]);
+  ws.mergeCells(1, 1, 1, Object.keys(rows[0]).length);
+  ws.getRow(1).font = { bold: true };
+
+  ws.addRow(Object.keys(rows[0]));
+  rows.forEach(r => ws.addRow(Object.values(r)));
+
+  ws.addRow([]);
+  ws.addRow([`Отчёт сформирован: ${new Date().toLocaleString()}`]);
+
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="phone_book.xlsx"`
   );
   res.setHeader(
     'Content-Type',

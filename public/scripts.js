@@ -900,7 +900,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function exportExcel() {
   if (currentTable === 'experience') {
-    window.open(`/export/excel/experience/${currentExperienceValue}`, '_blank');
+    window.open(`/export/experience_exel/${currentExperienceValue}`, '_blank');
   } else {
     window.open(`/export/excel/${currentTable}`, '_blank');
   }
