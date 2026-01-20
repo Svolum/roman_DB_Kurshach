@@ -1,3 +1,4 @@
+let currentExperienceValue = null;
 let accessLevel = null;
 let currentTable = null;
 let selectedRow = null;
@@ -867,12 +868,21 @@ function loadPhoneReport() {
 }
 
 function loadExperienceReport() {
+  const value = document.getElementById('experienceInput').value;
+
+  if (!value || value < 0) {
+    alert('Введите корректное значение стажа');
+    return;
+  }
+
+  currentExperienceValue = value;
   currentTable = 'experience';
-  hideForm();
-  fetch('/reports/experience/15')
+
+  fetch(`/reports/experience/${value}`)
     .then(r => r.json())
     .then(renderTable);
 }
+
 
 function loadAcademicReport() {
   currentTable = 'academic';
@@ -889,5 +899,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function exportExcel() {
-  window.open(`/export/excel/${currentTable}`, '_blank');
+  if (currentTable === 'experience') {
+    window.open(`/export/excel/experience/${currentExperienceValue}`, '_blank');
+  } else {
+    window.open(`/export/excel/${currentTable}`, '_blank');
+  }
 }
